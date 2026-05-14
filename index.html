@@ -766,6 +766,21 @@ async function initSync(){
 }
 
 let pollInterval=null;
+
+async function pullFromSupabase(){
+  if(!sbClient||!syncKey)return;
+  try{
+    const{data,error}=await sbClient.from('agenda_sync').select('data').eq('id',syncKey).maybeSingle();
+    if(error||!data)return;
+    if(data.data){
+      S={...S,...data.data};
+      if(S.lastDate!==dk(today)){S.chDone=false;S.habits=S.habits.map(h=>({...h,done:false}));S.lastDate=dk(today);}
+      localStorage.setItem('ag26_v3',JSON.stringify(S));
+      renderCurrentView();
+    }
+  }catch(e){console.error('Pull error',e);}
+}
+
 function startPolling(){
   if(pollInterval)clearInterval(pollInterval);
   pollInterval=setInterval(async()=>{
