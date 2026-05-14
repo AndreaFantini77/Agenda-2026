@@ -157,6 +157,8 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;backgroun
 .h-cb.on::after{content:'✓';font-size:9px;color:#fff;font-weight:700;}
 .h-del{background:none;border:none;color:rgba(232,228,220,.12);cursor:pointer;font-size:14px;padding:0 2px;transition:color .2s;margin-left:2px;}
 .h-del:hover{color:var(--red);}
+.h-edit{background:none;border:none;color:rgba(232,228,220,.15);cursor:pointer;font-size:12px;padding:0 2px;transition:color .2s;}
+.h-edit:hover{color:var(--gold);}
 .rta{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:7px;padding:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:11px;resize:none;height:68px;outline:none;line-height:1.5;}
 .rta:focus{border-color:rgba(212,168,75,.4);}
 .rta::placeholder{color:rgba(232,228,220,.2);}
@@ -325,6 +327,7 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;backgroun
       <div class="sync-dot" id="sync-dot"></div>
       <span class="sync-lbl" id="sync-lbl">Sync</span>
     </div>
+    <button class="ib" onclick="openCatsModal()">🎨 Categorie</button>
     <button class="ib" onclick="exportICS()">📅 ICS</button>
     <button class="ib" onclick="openM('install-modal')">📱</button>
   </div>
@@ -422,7 +425,7 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;backgroun
         <div class="card">
           <div class="lbl">Abitudini</div>
           <div id="hab-list"></div>
-          <button onclick="openM('habit-modal')" style="background:none;border:1px dashed rgba(255,255,255,.1);border-radius:6px;width:100%;padding:6px;color:var(--t3);font-size:11px;cursor:pointer;margin-top:8px;font-family:'DM Sans',sans-serif;transition:all .2s;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--t3)'">+ Abitudine</button>
+          <button onclick="editingHabitId=null;document.getElementById('habit-modal-title').textContent='Nuova abitudine';document.getElementById('habit-modal-btn').textContent='Aggiungi';document.getElementById('hm-n').value='';document.getElementById('hm-i').value='';openM('habit-modal')" style="background:none;border:1px dashed rgba(255,255,255,.1);border-radius:6px;width:100%;padding:6px;color:var(--t3);font-size:11px;cursor:pointer;margin-top:8px;font-family:'DM Sans',sans-serif;transition:all .2s;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--t3)'">+ Abitudine</button>
         </div>
         <div class="card">
           <div class="lbl">Riflessione serale</div>
@@ -566,12 +569,12 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;backgroun
 <!-- HABIT MODAL -->
 <div class="ov" id="habit-modal">
 <div class="mbox">
-  <h3>Nuova abitudine</h3>
+  <h3 id="habit-modal-title">Nuova abitudine</h3>
   <div class="mrow"><label>Nome</label><input type="text" id="hm-n" placeholder="Es. Meditazione, Sport…" maxlength="30"/></div>
   <div class="mrow"><label>Emoji</label><input type="text" id="hm-i" placeholder="🧘" maxlength="4"/></div>
   <div class="mbtns">
-    <button class="btnc" onclick="closeM('habit-modal')">Annulla</button>
-    <button class="btnok" onclick="addHabit()">Aggiungi</button>
+    <button class="btnc" onclick="editingHabitId=null;document.getElementById('habit-modal-title').textContent='Nuova abitudine';document.getElementById('habit-modal-btn').textContent='Aggiungi';closeM('habit-modal')">Annulla</button>
+    <button class="btnok" id="habit-modal-btn" onclick="addHabit()">Aggiungi</button>
   </div>
 </div>
 </div>
@@ -613,6 +616,21 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;backgroun
     <button class="btnc" onclick="closeM('act-modal')">Annulla</button>
     <button class="btnok" onclick="confirmAct()">Aggiungi</button>
   </div>
+</div>
+</div>
+
+<!-- CATEGORIES MODAL -->
+<div class="ov" id="cats-modal">
+<div class="mbox" style="max-height:90vh;overflow-y:auto;">
+  <h3>🎨 Tipi di evento</h3>
+  <div id="cats-list" style="margin-bottom:12px;"></div>
+  <button onclick="newCat()" style="background:none;border:1px dashed rgba(255,255,255,.15);border-radius:8px;width:100%;padding:9px;color:var(--t3);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;transition:all .2s;margin-bottom:12px;" onmouseover="this.style.color='var(--gold)';this.style.borderColor='rgba(212,168,75,.4)'" onmouseout="this.style.color='var(--t3)';this.style.borderColor='rgba(255,255,255,.15)'">+ Nuovo tipo</button>
+  <div id="cat-edit-section" style="display:none;background:rgba(255,255,255,.04);border-radius:10px;padding:12px;border:1px solid var(--border);">
+    <div class="mrow"><label>Nome</label><input type="text" id="cat-name-inp" placeholder="Es. Palestra, Call, Viaggio…" maxlength="25"/></div>
+    <div class="mrow"><label>Colore</label><div id="cat-color-pick" style="display:flex;gap:7px;flex-wrap:wrap;margin-top:4px;"></div></div>
+    <div class="mbtns"><button class="btnc" onclick="document.getElementById('cat-edit-section').style.display='none'">Annulla</button><button class="btnok" onclick="saveCat()">Salva</button></div>
+  </div>
+  <div class="mbtns" style="margin-top:10px;"><button class="btnok" onclick="closeM('cats-modal')">Chiudi</button></div>
 </div>
 </div>
 
@@ -680,14 +698,23 @@ const CHALLENGES=[
   {tag:'Relazioni',txt:'Invia un messaggio sincero a qualcuno che ti ha aiutato di recente.'},
 ];
 const REFLEX=['Cosa hai imparato oggi?','La tua vittoria più piccola di oggi?','Cosa faresti diversamente domani?','Hai rispettato le promesse a te stesso?','Quale abitudine hai rafforzato?'];
-const CAT_LBL={riunione:'Riunione',task:'Task',personale:'Personale',urgente:'Urgente',altro:'Altro'};
-const RCOLORS=['#d4a84b','#6eaaee','#4ecb6e','#e07070','#9a7ae8','#4ecbbf','#e8a878'];
-const DOT_CLASS={riunione:'dot-r',task:'dot-t',personale:'dot-p',urgente:'dot-u',altro:'dot-a'};
-const BADGE_CLASS={riunione:'br-r',task:'br-t',personale:'br-p',urgente:'br-u',altro:'br-a'};
+const PALETTE=['#d4a84b','#6eaaee','#4ecb6e','#e07070','#9a7ae8','#4ecbbf','#e8a878','#e87ab0','#a8d46e','#e8c46e','#6eb4e8','#e8906e'];
+
+const DEFAULT_CATS=[
+  {id:'riunione', label:'Riunione', color:'#6eaaee'},
+  {id:'task',     label:'Task',     color:'#d4a84b'},
+  {id:'personale',label:'Personale',color:'#4ecb6e'},
+  {id:'urgente',  label:'Urgente',  color:'#e07070'},
+  {id:'altro',    label:'Altro',    color:'#9a7ae8'},
+];
+
+// Dynamic helpers — always read from S.cats
+function getCats(){return S.cats&&S.cats.length?S.cats:DEFAULT_CATS;}
+function catById(id){return getCats().find(c=>c.id===id)||{id:'altro',label:'Altro',color:'#9a7ae8'};}
 
 // ── STATE ──
 const today=new Date();
-let dayOff=0, wkOff=0, filterCat='all', pendingDay=null, activeBlock=null, selColor=RCOLORS[0];
+let dayOff=0, wkOff=0, filterCat='all', pendingDay=null, activeBlock=null, selColor=PALETTE[0], selCatColor=PALETTE[0];
 let pomTimer=null, pomSec=25*60, pomTotal=25*60, pomRunning=false;
 
 let S={
@@ -698,6 +725,7 @@ let S={
   ],
   chDone:false, lastDate:null,
   events:{}, todos:[], reflections:{},
+  cats: DEFAULT_CATS.map(c=>({...c})),
   blocks:[
     {id:1,role:'Physical Power',color:'#d4a84b',outcome:'Forma fisica e mentale ottimale',purpose:'Per avere energia e lucidità ogni giorno',
      actions:[{id:101,dur:'0:30',pri:1,txt:'Esercizi mattutini (x5)',status:''},{id:102,dur:'0:20',pri:2,txt:'Respirazione',status:''},{id:103,dur:'1:00',pri:3,txt:'Sport / Yoga',status:''}]},
@@ -816,6 +844,7 @@ function save(){
 
 function load(){
   try{const r=localStorage.getItem('ag26_v3');if(r){const sv=JSON.parse(r);S={...S,...sv};}}catch(e){}
+  if(!S.cats||!S.cats.length)S.cats=DEFAULT_CATS.map(c=>({...c}));
   if(S.lastDate!==dk(today)){
     S.chDone=false;
     S.habits=S.habits.map(h=>{
@@ -988,16 +1017,18 @@ function renderTGrid(d){
     const slot=document.createElement('div');
     slot.className='ts'+(isT&&h===curH?' cur-h':'');
     const hEvs=evs.filter(e=>parseInt(e.s.split(':')[0])===h);
-    const pills=hEvs.map(e=>`
-      <div class="epill c-${e.c}">
-        <div class="ep-dot ${DOT_CLASS[e.c]||'dot-t'}"></div>
+    const pills=hEvs.map(e=>{
+      const cat=catById(e.c);
+      return `
+      <div class="epill" style="background:${cat.color};">
+        <div class="ep-dot" style="background:rgba(0,0,0,0.2);"></div>
         <div class="ep-body">
           <div class="ep-ti">${e.t}</div>
           <div class="ep-me">${e.s}–${e.e}${e.n?' · '+e.n.substring(0,25):''}</div>
         </div>
         <button class="ep-ics" onclick="exportSingleICS('${key}',${e.id},event)" title="→ Calendar">📅</button>
         <button class="ep-del" onclick="delEv('${key}',${e.id},event)">✕</button>
-      </div>`).join('');
+      </div>`;}).join('');
     slot.innerHTML=`<div class="ts-h">${p2(h)}</div><div class="ts-body">${pills}<div class="ts-hint">+ evento</div></div>`;
     slot.addEventListener('click',ev=>{
       if(ev.target.closest('.epill'))return;
@@ -1024,9 +1055,21 @@ function renderHabitList(){
         <div class="h-nm" onclick="togH(${h.id})">${h.name}</div>
         <div class="h-st">${h.streak>0?'🔥'+h.streak:''}</div>
         <div class="h-cb ${h.done?'on':''}" onclick="togH(${h.id})"></div>
+        <button class="h-edit" onclick="editHabit(${h.id})" title="Modifica">✏️</button>
         <button class="h-del" onclick="delHabit(${h.id})" title="Elimina">✕</button>
       </div>`).join('')
     :'<div style="font-size:11px;color:var(--t3);font-style:italic;padding:8px 0;">Nessuna abitudine.</div>';
+}
+
+let editingHabitId=null;
+function editHabit(id){
+  const h=S.habits.find(x=>x.id===id);if(!h)return;
+  editingHabitId=id;
+  document.getElementById('hm-n').value=h.name;
+  document.getElementById('hm-i').value=h.icon;
+  document.getElementById('habit-modal-title').textContent='Modifica abitudine';
+  document.getElementById('habit-modal-btn').textContent='Salva';
+  openM('habit-modal');
 }
 
 function togH(id){
@@ -1039,8 +1082,19 @@ function togH(id){
 function delHabit(id){if(!confirm('Eliminare questa abitudine?'))return;S.habits=S.habits.filter(x=>x.id!==id);save();renderHabitList();renderHabitRings();toast('🗑 Eliminata');}
 function addHabit(){
   const n=document.getElementById('hm-n').value.trim();if(!n)return;
-  S.habits.push({id:Date.now(),name:n,icon:document.getElementById('hm-i').value.trim()||'⭐',streak:0,done:false,history:{}});
-  closeM('habit-modal');save();renderHabitList();renderHabitRings();toast('✨ Abitudine aggiunta!');
+  const icon=document.getElementById('hm-i').value.trim()||'⭐';
+  if(editingHabitId){
+    const h=S.habits.find(x=>x.id===editingHabitId);
+    if(h){h.name=n;h.icon=icon;}
+    editingHabitId=null;
+    toast('✅ Abitudine aggiornata!');
+  }else{
+    S.habits.push({id:Date.now(),name:n,icon,streak:0,done:false,history:{}});
+    toast('✨ Abitudine aggiunta!');
+  }
+  document.getElementById('habit-modal-title').textContent='Nuova abitudine';
+  document.getElementById('habit-modal-btn').textContent='Aggiungi';
+  closeM('habit-modal');save();renderHabitList();renderHabitRings();
 }
 function chDay(d){dayOff+=d;renderOggi();}
 function saveRefl(){S.reflections['r_'+dk(viewDate())]=document.getElementById('rta').value;save();toast('📝 Salvata!');}
@@ -1066,27 +1120,96 @@ function saveEvent(){
 function delEv(key,id,ev){ev.stopPropagation();S.events[key]=(S.events[key]||[]).filter(e=>e.id!==id);if(activeTab==='oggi')renderOggi();if(activeTab==='settimana')renderWeek();save();}
 
 // ── TODOS ──
-const CATS=['all','task','riunione','urgente','personale','altro'];
 function renderTodos(){
+  const cats=getCats();
   const f=document.getElementById('tfilters');
-  f.innerHTML=CATS.map(c=>`<button class="tf ${filterCat===c?'on':''}" onclick="setF('${c}')">${c==='all'?'Tutti':CAT_LBL[c]}</button>`).join('');
+  f.innerHTML='<button class="tf '+(filterCat==='all'?'on':'')+'" onclick="setF(\'all\')">Tutti</button>'+
+    cats.map(c=>`<button class="tf ${filterCat===c.id?'on':''}" onclick="setF('${c.id}')" style="${filterCat===c.id?'border-color:'+c.color+';color:'+c.color+';':''}">${c.label}</button>`).join('');
   const items=filterCat==='all'?S.todos:S.todos.filter(x=>x.c===filterCat);
   const list=document.getElementById('todo-list');
-  list.innerHTML=items.length?items.map(t=>`
-    <div class="ti ${t.done?'done-t':''}">
+  list.innerHTML=items.length?items.map(t=>{
+    const cat=catById(t.c);
+    return `<div class="ti ${t.done?'done-t':''}">
       <div class="tcb ${t.done?'on':''}" onclick="togT(${t.id})"></div>
       <div class="ti-body">
         <div class="ti-txt">${t.txt}</div>
-        <div class="ti-meta"><span class="ti-badge ${BADGE_CLASS[t.c]||''}">${CAT_LBL[t.c]}</span></div>
+        <div class="ti-meta"><span class="ti-badge" style="background:${cat.color}22;color:${cat.color};">${cat.label}</span></div>
       </div>
       <button class="ti-del" onclick="delT(${t.id})">✕</button>
-    </div>`).join('')
+    </div>`;}).join('')
     :'<div style="font-size:11px;color:var(--t3);font-style:italic;padding:8px 0;text-align:center;">Nessun task — aggiungine uno!</div>';
+  // Refresh category selects
+  refreshCatSelects();
 }
 function setF(c){filterCat=c;renderTodos();}
 function addTodo(){const txt=document.getElementById('tinp').value.trim();if(!txt)return;S.todos.push({id:Date.now(),txt,c:document.getElementById('tcat').value,done:false});document.getElementById('tinp').value='';renderTodos();save();toast('📌 Task aggiunto!');}
 function togT(id){const t=S.todos.find(x=>x.id===id);if(t){t.done=!t.done;renderTodos();save();}}
 function delT(id){S.todos=S.todos.filter(x=>x.id!==id);renderTodos();save();}
+
+function refreshCatSelects(){
+  const cats=getCats();
+  const opts=cats.map(c=>`<option value="${c.id}">${c.label}</option>`).join('');
+  ['ev-c','tcat'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    const cur=el.value;
+    el.innerHTML=opts;
+    if(cats.find(c=>c.id===cur))el.value=cur;
+  });
+}
+
+// ── CATEGORIES MANAGEMENT ──
+let editCatId=null;
+function openCatsModal(){
+  renderCatsList();
+  openM('cats-modal');
+}
+function renderCatsList(){
+  const wrap=document.getElementById('cats-list');
+  wrap.innerHTML=getCats().map(c=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
+      <div style="width:18px;height:18px;border-radius:50%;background:${c.color};flex-shrink:0;"></div>
+      <div style="flex:1;font-size:13px;color:var(--text);">${c.label}</div>
+      <button onclick="editCat('${c.id}')" style="background:none;border:1px solid var(--border2);border-radius:5px;padding:3px 9px;color:var(--t2);font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;">✏️</button>
+      <button onclick="deleteCat('${c.id}')" style="background:none;border:none;color:rgba(232,228,220,.15);font-size:14px;cursor:pointer;transition:color .2s;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='rgba(232,228,220,.15)'">✕</button>
+    </div>`).join('');
+}
+function editCat(id){
+  const c=catById(id);editCatId=id;
+  document.getElementById('cat-name-inp').value=c.label;
+  selCatColor=c.color;
+  renderCatColorPicker();
+  document.getElementById('cat-edit-section').style.display='block';
+}
+function newCat(){
+  editCatId=null;
+  document.getElementById('cat-name-inp').value='';
+  selCatColor=PALETTE[0];
+  renderCatColorPicker();
+  document.getElementById('cat-edit-section').style.display='block';
+}
+function renderCatColorPicker(){
+  document.getElementById('cat-color-pick').innerHTML=PALETTE.map(c=>`<div onclick="selCatC('${c}',this)" style="width:22px;height:22px;border-radius:50%;background:${c};cursor:pointer;border:2px solid ${c===selCatColor?'#fff':'transparent'};transition:all .2s;flex-shrink:0;"></div>`).join('');
+}
+function selCatC(c,el){selCatColor=c;document.querySelectorAll('#cat-color-pick div').forEach(d=>d.style.borderColor='transparent');el.style.borderColor='#fff';}
+function saveCat(){
+  const name=document.getElementById('cat-name-inp').value.trim();if(!name)return;
+  if(!S.cats||!S.cats.length)S.cats=DEFAULT_CATS.map(c=>({...c}));
+  if(editCatId){
+    const c=S.cats.find(x=>x.id===editCatId);if(c){c.label=name;c.color=selCatColor;}
+  }else{
+    const newId='cat_'+Date.now();
+    S.cats.push({id:newId,label:name,color:selCatColor});
+  }
+  editCatId=null;
+  document.getElementById('cat-edit-section').style.display='none';
+  renderCatsList();refreshCatSelects();save();toast('✅ Categoria salvata!');
+}
+function deleteCat(id){
+  if(S.cats.length<=1){toast('⚠️ Deve restare almeno una categoria');return;}
+  if(!confirm('Eliminare questa categoria?'))return;
+  S.cats=S.cats.filter(c=>c.id!==id);
+  renderCatsList();refreshCatSelects();save();toast('🗑 Categoria eliminata');
+}
 
 // ── WEEK ──
 function renderWeek(){
@@ -1110,8 +1233,8 @@ function renderWGrid(mon){
       const dd=addD(mon,i);const key=dk(dd);
       const evs=(S.events[key]||[]).filter(e=>parseInt(e.s.split(':')[0])===h);
       cells+=`<div class="wg-cell" onclick="openEvFromGrid('${key}',${h})">
-        ${evs.map(e=>`<div class="em c-${e.c}" onclick="event.stopPropagation();goDay2('${key}')">
-          <div class="em-t">${e.t}</div><div class="em-s">${e.s}–${e.e}</div></div>`).join('')}
+        ${evs.map(e=>{const cat=catById(e.c);return `<div class="em" style="background:${cat.color};" onclick="event.stopPropagation();goDay2('${key}')">
+          <div class="em-t">${e.t}</div><div class="em-s">${e.s}–${e.e}</div></div>`;}).join('')}
       </div>`;
     });
     row.innerHTML=cells;body.appendChild(row);
