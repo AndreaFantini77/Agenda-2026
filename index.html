@@ -120,7 +120,7 @@ html,body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;backgroun
 .day-date{font-size:10px;color:var(--t3);margin-top:1px;}
 .add-ev{background:var(--gold);border:none;border-radius:7px;padding:5px 14px;font-size:11px;font-weight:500;color:#0d0b08;cursor:pointer;font-family:'DM Sans',sans-serif;}
 
-.tgrid{background:var(--s1);border:1px solid var(--border);border-radius:12px;overflow:hidden;position:relative;}
+.tgrid{background:var(--s1);border:1px solid var(--border);border-radius:12px;overflow-y:auto;max-height:560px;position:relative;}
 .now-line{position:absolute;left:52px;right:0;height:2px;background:var(--gold);z-index:5;pointer-events:none;}
 .now-dot{position:absolute;left:48px;width:8px;height:8px;border-radius:50%;background:var(--gold);margin-top:-3px;z-index:5;}
 .ts{display:flex;min-height:50px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .15s;position:relative;}
@@ -995,53 +995,100 @@ function renderOggi(){
 
 function renderTGrid(d){
   const grid=document.getElementById('tgrid');
-  const key=dk(d);const evs=S.events[key]||[];
-  const now=new Date();const curH=now.getHours();const curM=now.getMinutes();
+  const key=dk(d);
+  const evs=S.events[key]||[];
+  const now=new Date();
+  const curH=now.getHours();const curM=now.getMinutes();
   const isT=dk(d)===dk(today);
+  const SLOT_H=56; // px per hour
+  const START_H=7; // grid starts at 7:00
+  const N_HOURS=HOURS.length; // 15 hours (7-21)
+  const totalH=SLOT_H*N_HOURS;
+
   grid.innerHTML='';
-  if(isT){
-    const topPct=((curH-7)/15)*100;
-    const minPct=(curM/60)*(100/15);
-    const totalPct=topPct+minPct;
-    if(totalPct>=0&&totalPct<=100){
-      const line=document.createElement('div');
-      line.className='now-line';
-      line.style.top=totalPct+'%';
-      const dot=document.createElement('div');
-      dot.className='now-dot';
-      dot.style.top=totalPct+'%';
-      grid.appendChild(dot);grid.appendChild(line);
-    }
-  }
-  HOURS.forEach(h=>{
-    const slot=document.createElement('div');
-    slot.className='ts'+(isT&&h===curH?' cur-h':'');
-    const hEvs=evs.filter(e=>parseInt(e.s.split(':')[0])===h);
-    const pills=hEvs.map(e=>{
-      const cat=catById(e.c);
-      return `
-      <div class="epill" style="background:${cat.color};">
-        <div class="ep-dot" style="background:rgba(0,0,0,0.2);"></div>
-        <div class="ep-body">
-          <div class="ep-ti">${e.t}</div>
-          <div class="ep-me">${e.s}–${e.e}${e.n?' · '+e.n.substring(0,25):''}</div>
-        </div>
-        <button class="ep-ics" onclick="exportSingleICS('${key}',${e.id},event)" title="→ Calendar">📅</button>
-        <button class="ep-del" onclick="delEv('${key}',${e.id},event)">✕</button>
-      </div>`;}).join('');
-    slot.innerHTML=`<div class="ts-h">${p2(h)}</div><div class="ts-body">${pills}<div class="ts-hint">+ evento</div></div>`;
-    slot.addEventListener('click',ev=>{
+  grid.style.position='relative';
+  grid.style.height=totalH+'px';
+  grid.style.overflow='hidden';
+
+  // Hour rows (background)
+  HOURS.forEach((h,i)=>{
+    const row=document.createElement('div');
+    row.style.cssText=`position:absolute;left:0;right:0;top:${i*SLOT_H}px;height:${SLOT_H}px;display:flex;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;transition:background .15s;`;
+    row.classList.add('ts-row');
+    if(isT&&h===curH)row.style.background='rgba(212,168,75,0.05)';
+    const label=document.createElement('div');
+    label.style.cssText=`width:52px;flex-shrink:0;padding:8px 8px 0 10px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:${isT&&h===curH?'var(--gold)':'var(--hour)'};letter-spacing:.03em;border-right:1px solid rgba(255,255,255,0.06);`;
+    label.textContent=p2(h);
+    const body=document.createElement('div');
+    body.style.cssText='flex:1;position:relative;';
+    const hint=document.createElement('div');
+    hint.style.cssText='font-size:10px;color:rgba(232,228,220,.08);padding:18px 8px 0;font-style:italic;';
+    hint.textContent='+ evento';
+    body.appendChild(hint);
+    row.appendChild(label);row.appendChild(body);
+    row.addEventListener('click',ev=>{
       if(ev.target.closest('.epill'))return;
       pendingDay=key;
+      document.getElementById('ev-day').value=key;
       document.getElementById('ev-s').value=p2(h)+':00';
       document.getElementById('ev-e').value=p2(Math.min(h+1,22))+':00';
-      openEvModal();
+      openM('ev-modal');
     });
-    grid.appendChild(slot);
+    row.addEventListener('mouseenter',()=>{if(!row.style.background||row.style.background==='')row.style.background='rgba(255,255,255,0.015)';hint.style.color='rgba(232,228,220,.18)';});
+    row.addEventListener('mouseleave',()=>{if(isT&&h===curH)row.style.background='rgba(212,168,75,0.05)';else row.style.background='';hint.style.color='rgba(232,228,220,.08)';});
+    grid.appendChild(row);
   });
-  if(isT&&document.getElementById('v-oggi').classList.contains('on')){
-    const curRow=grid.querySelectorAll('.ts')[Math.max(0,curH-7)];
-    if(curRow)setTimeout(()=>curRow.scrollIntoView({behavior:'smooth',block:'center'}),100);
+
+  // Events — absolutely positioned spanning full duration
+  evs.forEach(e=>{
+    const[sh,sm]=e.s.split(':').map(Number);
+    const[eh,em]=e.e.split(':').map(Number);
+    const startMin=(sh-START_H)*60+sm;
+    const endMin=(eh-START_H)*60+em;
+    const durMin=Math.max(30,endMin-startMin); // min 30min height
+    const topPx=(startMin/60)*SLOT_H;
+    const heightPx=Math.max(28,(durMin/60)*SLOT_H-4);
+    const cat=catById(e.c);
+
+    const pill=document.createElement('div');
+    pill.className='epill';
+    pill.style.cssText=`
+      position:absolute;
+      left:56px;right:6px;
+      top:${topPx+2}px;
+      height:${heightPx}px;
+      background:${cat.color};
+      border-radius:7px;
+      padding:5px 8px;
+      cursor:pointer;
+      display:flex;align-items:flex-start;gap:6px;
+      z-index:2;
+      overflow:hidden;
+      box-shadow:0 2px 8px rgba(0,0,0,0.25);
+      transition:opacity .2s,box-shadow .2s;
+    `;
+    pill.innerHTML=`
+      <div style="flex:1;min-width:0;">
+        <div class="ep-ti" style="font-size:${heightPx>40?12:10}px;">${e.t}</div>
+        ${heightPx>36?`<div class="ep-me">${e.s}–${e.e}${e.n?' · '+e.n.substring(0,20):''}</div>`:''}
+      </div>
+      <button class="ep-ics" onclick="exportSingleICS('${key}',${e.id},event)" title="→ Calendar" style="flex-shrink:0;">📅</button>
+      <button class="ep-del" onclick="delEv('${key}',${e.id},event)" style="flex-shrink:0;">✕</button>
+    `;
+    pill.addEventListener('mouseenter',()=>{pill.style.opacity='.85';pill.style.boxShadow='0 4px 14px rgba(0,0,0,0.35)';});
+    pill.addEventListener('mouseleave',()=>{pill.style.opacity='1';pill.style.boxShadow='0 2px 8px rgba(0,0,0,0.25)';});
+    grid.appendChild(pill);
+  });
+
+  // Current time line
+  if(isT&&curH>=START_H&&curH<=21){
+    const topPx=((curH-START_H)*60+curM)/60*SLOT_H;
+    const line=document.createElement('div');
+    line.style.cssText=`position:absolute;left:52px;right:0;top:${topPx}px;height:2px;background:var(--gold);z-index:5;pointer-events:none;`;
+    const dot=document.createElement('div');
+    dot.style.cssText=`position:absolute;left:48px;top:${topPx-3}px;width:8px;height:8px;border-radius:50%;background:var(--gold);z-index:5;pointer-events:none;`;
+    grid.appendChild(dot);grid.appendChild(line);
+    setTimeout(()=>line.scrollIntoView({behavior:'smooth',block:'center'}),150);
   }
 }
 
