@@ -1267,25 +1267,123 @@ function renderWeek(){
 }
 function chWk(d){wkOff+=d;renderWeek();}
 function renderWGrid(mon){
-  const cols='44px '+DSS.map(()=>'1fr').join(' ');
-  const hdr=document.getElementById('wg-hdr');hdr.style.gridTemplateColumns=cols;
-  hdr.innerHTML='<div style="width:44px;border-right:1px solid rgba(255,255,255,.04);"></div>'+
-    DSS.map((d,i)=>{const dd=addD(mon,i);const it=dk(dd)===dk(today);
-      return `<div class="wg-dh"><div class="wg-dn">${d}</div><div class="wg-dd ${it?'tod':''}" onclick="goDay(${i})">${dd.getDate()}</div></div>`;}).join('');
-  const body=document.getElementById('wg-body');body.innerHTML='';
-  HOURS.forEach(h=>{
-    const row=document.createElement('div');row.className='wg-row';row.style.gridTemplateColumns=cols;
-    let cells=`<div class="wg-h">${p2(h)}</div>`;
-    DSS.forEach((_,i)=>{
-      const dd=addD(mon,i);const key=dk(dd);
-      const evs=(S.events[key]||[]).filter(e=>parseInt(e.s.split(':')[0])===h);
-      cells+=`<div class="wg-cell" onclick="openEvFromGrid('${key}',${h})">
-        ${evs.map(e=>{const cat=catById(e.c);return `<div class="em" style="background:${cat.color};" onclick="event.stopPropagation();goDay2('${key}')">
-          <div class="em-t">${e.t}</div><div class="em-s">${e.s}–${e.e}</div></div>`;}).join('')}
+  const SLOT_H=52;
+  const START_H=7;
+  const N_HOURS=HOURS.length;
+  const totalH=SLOT_H*N_HOURS;
+  const now=new Date();
+
+  // Header
+  const hdr=document.getElementById('wg-hdr');
+  hdr.style.display='flex';
+  hdr.innerHTML='<div style="width:48px;flex-shrink:0;border-right:1px solid rgba(255,255,255,.04);"></div>'+
+    DSS.map((d,i)=>{
+      const dd=addD(mon,i);const it=dk(dd)===dk(today);
+      return `<div class="wg-dh" style="flex:1;">
+        <div class="wg-dn">${d}</div>
+        <div class="wg-dd ${it?'tod':''}" onclick="goDay(${i})">${dd.getDate()}</div>
       </div>`;
-    });
-    row.innerHTML=cells;body.appendChild(row);
+    }).join('');
+
+  // Body — one scrollable container with absolute layout
+  const body=document.getElementById('wg-body');
+  body.innerHTML='';
+  body.style.position='relative';
+  body.style.overflowY='auto';
+  body.style.maxHeight='520px';
+
+  // Inner wrapper
+  const inner=document.createElement('div');
+  inner.style.cssText=`position:relative;height:${totalH}px;display:flex;`;
+
+  // Hour labels column
+  const hourCol=document.createElement('div');
+  hourCol.style.cssText=`width:48px;flex-shrink:0;position:relative;border-right:1px solid rgba(255,255,255,.05);`;
+  HOURS.forEach((h,i)=>{
+    const lbl=document.createElement('div');
+    lbl.style.cssText=`position:absolute;top:${i*SLOT_H}px;left:0;right:0;height:${SLOT_H}px;padding:8px 6px 0;font-family:'DM Mono',monospace;font-size:9px;font-weight:500;color:var(--hour);letter-spacing:.03em;border-bottom:1px solid rgba(255,255,255,.03);`;
+    lbl.textContent=p2(h);
+    hourCol.appendChild(lbl);
   });
+  inner.appendChild(hourCol);
+
+  // Day columns
+  DSS.forEach((d,i)=>{
+    const dd=addD(mon,i);
+    const key=dk(dd);
+    const isToday=dk(dd)===dk(today);
+    const dayEvs=S.events[key]||[];
+
+    const col=document.createElement('div');
+    col.style.cssText=`flex:1;position:relative;border-right:1px solid rgba(255,255,255,.03);min-width:0;`;
+
+    // Hour row backgrounds + click targets
+    HOURS.forEach((h,hi)=>{
+      const cell=document.createElement('div');
+      cell.style.cssText=`position:absolute;left:0;right:0;top:${hi*SLOT_H}px;height:${SLOT_H}px;border-bottom:1px solid rgba(255,255,255,.03);cursor:pointer;transition:background .15s;`;
+      if(isToday&&h===now.getHours())cell.style.background='rgba(212,168,75,.04)';
+      cell.addEventListener('mouseenter',()=>{cell.style.background='rgba(255,255,255,.02)';});
+      cell.addEventListener('mouseleave',()=>{cell.style.background=isToday&&h===now.getHours()?'rgba(212,168,75,.04)':'';});
+      cell.addEventListener('click',()=>openEvFromGrid(key,h));
+      col.appendChild(cell);
+    });
+
+    // Events — absolutely positioned
+    dayEvs.forEach(e=>{
+      const[sh,sm]=e.s.split(':').map(Number);
+      const[eh,em]=e.e.split(':').map(Number);
+      const startMin=(sh-START_H)*60+sm;
+      const endMin=(eh-START_H)*60+em;
+      const durMin=Math.max(30,endMin-startMin);
+      const topPx=(startMin/60)*SLOT_H;
+      const heightPx=Math.max(22,(durMin/60)*SLOT_H-3);
+      const cat=catById(e.c);
+
+      const pill=document.createElement('div');
+      pill.style.cssText=`
+        position:absolute;
+        left:2px;right:2px;
+        top:${topPx+1}px;
+        height:${heightPx}px;
+        background:${cat.color};
+        border-radius:5px;
+        padding:3px 5px;
+        cursor:pointer;
+        z-index:2;
+        overflow:hidden;
+        box-shadow:0 1px 4px rgba(0,0,0,0.25);
+        transition:opacity .15s,box-shadow .15s;
+      `;
+      pill.innerHTML=`
+        <div style="font-size:${heightPx>32?10:9}px;font-weight:500;color:#0d0b08;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.t}</div>
+        ${heightPx>28?`<div style="font-size:8px;color:rgba(0,0,0,.5);">${e.s}–${e.e}</div>`:''}
+      `;
+      pill.addEventListener('mouseenter',()=>{pill.style.opacity='.82';pill.style.boxShadow='0 3px 10px rgba(0,0,0,.35)';});
+      pill.addEventListener('mouseleave',()=>{pill.style.opacity='1';pill.style.boxShadow='0 1px 4px rgba(0,0,0,.25)';});
+      pill.addEventListener('click',ev=>{ev.stopPropagation();goDay2(key);});
+      col.appendChild(pill);
+    });
+
+    // Current time line on today's column
+    if(isToday&&now.getHours()>=START_H){
+      const curMin=(now.getHours()-START_H)*60+now.getMinutes();
+      const topPx=(curMin/60)*SLOT_H;
+      const line=document.createElement('div');
+      line.style.cssText=`position:absolute;left:0;right:0;top:${topPx}px;height:2px;background:var(--gold);z-index:4;pointer-events:none;`;
+      const dot=document.createElement('div');
+      dot.style.cssText=`position:absolute;left:-3px;top:${topPx-3}px;width:8px;height:8px;border-radius:50%;background:var(--gold);z-index:4;pointer-events:none;`;
+      col.appendChild(dot);col.appendChild(line);
+    }
+
+    inner.appendChild(col);
+  });
+
+  body.appendChild(inner);
+
+  // Scroll to current time
+  const curMin=(now.getHours()-START_H)*60+now.getMinutes();
+  const scrollTo=Math.max(0,(curMin/60)*SLOT_H-120);
+  setTimeout(()=>body.scrollTop=scrollTo,100);
 }
 function goDay(i){const mon=wkMon(wkOff);const dd=addD(mon,i);dayOff=Math.round((dd-today)/86400000);svTab('oggi');}
 function goDay2(key){const d=new Date(key);dayOff=Math.round((d-today)/86400000);svTab('oggi');}
